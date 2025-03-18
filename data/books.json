@@ -1,0 +1,18 @@
+﻿[
+    {
+        "id":  1,
+        "publisher":  "Technical Publishing",
+        "isbn":  "978-4-7741-1234-5",
+        "publishedDate":  "2024-01-01",
+        "author":  "Yamada Taro",
+        "title":  "PowerShell Book"
+    },
+    {
+        "id":  2,
+        "publisher":  "IT Publishing",
+        "isbn":  "978-4-7981-5678-9",
+        "publishedDate":  "2024-02-15",
+        "author":  "Suzuki Hanako",
+        "title":  "Windows Features Guide"
+    }
+]
