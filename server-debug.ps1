@@ -5,13 +5,16 @@ $OutputEncoding = $e
 
 # Server settings
 $p = 8080
-$u = "http://localhost:${p}/"
+$u = "http://*:${p}/"
 $l = New-Object System.Net.HttpListener
 $l.Prefixes.Add($u)
 
 try {
     $l.Start()
-    Write-Output "Server: $u"
+    # IPアドレス情報を表示
+    $ip = @(Get-NetIPAddress | Where-Object {$_.AddressFamily -eq "IPv4" -and $_.IPAddress -ne "127.0.0.1"} | Select-Object -ExpandProperty IPAddress)
+    Write-Output "Server IP: $ip Port: $p"
+    Write-Output "アクセス用URL: http://${ip}:$p/"
     
     # Data dir
     $d = Join-Path $PSScriptRoot "data"

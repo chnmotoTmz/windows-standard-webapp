@@ -1,1 +1,183 @@
- 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>データ管理ツール</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'メイリオ', sans-serif; background: #f5f5f5; padding: 20px; }
+        .c { max-width: 800px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.5rem; margin-bottom: 20px; color: #333; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .b { display: inline-block; padding: 8px 15px; margin: 5px; background: #3498db; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        .b:hover { background: #2980b9; }
+        .t { width: 100%; height: 400px; margin: 20px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; }
+        .i { padding: 10px; margin: 10px 0; display: none; border-radius: 4px; }
+        .s { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; }
+        .e { background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; }
+        .n { display: flex; justify-content: space-between; align-items: center; }
+        .n a { color: #3498db; text-decoration: none; }
+        .n a:hover { text-decoration: underline; }
+        .g { margin-top: 20px; }
+        #f { display: none; }
+    </style>
+</head>
+<body>
+    <div class="c">
+        <div class="n">
+            <h1>データ管理ツール</h1>
+            <a href="/">メインページへ戻る</a>
+        </div>
+        
+        <div class="g">
+            <button class="b" id="d">JSONデータをダウンロード</button>
+            <button class="b" id="l">JSONデータを読み込む</button>
+            <button class="b" id="s">変更を保存</button>
+            <input type="file" id="f" accept=".json">
+            <button class="b" id="u">ファイルをアップロード</button>
+        </div>
+        
+        <div id="m" class="i"></div>
+        <textarea class="t" id="j" placeholder="JSONデータがここに表示されます..."></textarea>
+    </div>
+
+    <script>
+        const $ = document.querySelector.bind(document);
+        const d = $('#d'); // ダウンロードボタン
+        const l = $('#l'); // 読み込みボタン
+        const s = $('#s'); // 保存ボタン
+        const u = $('#u'); // アップロードボタン
+        const f = $('#f'); // ファイル入力
+        const j = $('#j'); // JSONエディタ
+        const m = $('#m'); // メッセージ領域
+        
+        // メッセージ表示
+        function msg(t, c) {
+            m.textContent = t;
+            m.className = `i ${c}`;
+            m.style.display = 'block';
+            setTimeout(() => { m.style.display = 'none'; }, 5000);
+        }
+        
+        // JSONフォーマット検証
+        function validJson(t) {
+            try {
+                JSON.parse(t);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        // データのダウンロード
+        d.addEventListener('click', async () => {
+            try {
+                const r = await fetch('/api/data/download');
+                if (r.ok) {
+                    const b = await r.blob();
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(b);
+                    a.download = 'books.json';
+                    a.click();
+                    msg('JSONファイルをダウンロードしました', 's');
+                } else {
+                    msg(`エラー: ${r.status} ${r.statusText}`, 'e');
+                }
+            } catch (e) {
+                msg(`ダウンロード失敗: ${e.message}`, 'e');
+            }
+        });
+        
+        // データの読み込み
+        l.addEventListener('click', async () => {
+            try {
+                const r = await fetch('/api/data/view');
+                if (r.ok) {
+                    const t = await r.text();
+                    j.value = JSON.stringify(JSON.parse(t), null, 2);
+                    msg('JSONデータを読み込みました', 's');
+                } else {
+                    msg(`読み込み失敗: ${r.status} ${r.statusText}`, 'e');
+                }
+            } catch (e) {
+                msg(`読み込み失敗: ${e.message}`, 'e');
+            }
+        });
+        
+        // 変更の保存
+        s.addEventListener('click', async () => {
+            const t = j.value.trim();
+            if (!t) {
+                msg('データが空です', 'e');
+                return;
+            }
+            
+            if (!validJson(t)) {
+                msg('有効なJSONフォーマットではありません', 'e');
+                return;
+            }
+            
+            try {
+                const r = await fetch('/api/data/edit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: t
+                });
+                
+                if (r.ok) {
+                    msg('変更を保存しました', 's');
+                } else {
+                    const t = await r.text();
+                    msg(`保存失敗: ${t}`, 'e');
+                }
+            } catch (e) {
+                msg(`保存失敗: ${e.message}`, 'e');
+            }
+        });
+        
+        // ファイルアップロード - ファイル選択
+        u.addEventListener('click', () => f.click());
+        
+        // ファイルアップロード - 処理
+        f.addEventListener('change', async (e) => {
+            if (!f.files.length) return;
+            
+            const file = f.files[0];
+            if (!file.name.endsWith('.json')) {
+                msg('JSONファイルを選択してください', 'e');
+                return;
+            }
+            
+            try {
+                const text = await file.text();
+                
+                if (!validJson(text)) {
+                    msg('選択したファイルは有効なJSONではありません', 'e');
+                    return;
+                }
+                
+                const r = await fetch('/api/data/upload', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: text
+                });
+                
+                if (r.ok) {
+                    j.value = JSON.stringify(JSON.parse(text), null, 2);
+                    msg('ファイルをアップロードしました', 's');
+                } else {
+                    const t = await r.text();
+                    msg(`アップロード失敗: ${t}`, 'e');
+                }
+            } catch (e) {
+                msg(`アップロード処理エラー: ${e.message}`, 'e');
+            }
+            
+            f.value = ''; // 入力をリセット
+        });
+        
+        // ページ読み込み時にデータを自動取得
+        window.addEventListener('load', () => l.click());
+    </script>
+</body>
+</html> 
