@@ -1,217 +1,290 @@
-# Debug Server for Book Management App
-$OutputEncoding = [System.Text.Encoding]::UTF8
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+# Book App Server - Short var names for better compatibility
+$e = [System.Text.Encoding]::UTF8
+$OutputEncoding = $e
+[Console]::OutputEncoding = $e
 
-# HTTP server settings
-$port = 8080
-$url = "http://localhost:${port}/"
-$listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add($url)
+# Server settings
+$p = 8080
+$u = "http://localhost:${p}/"
+$l = New-Object System.Net.HttpListener
+$l.Prefixes.Add($u)
 
-# Start the server
 try {
-    $listener.Start()
-    Write-Output "Server started successfully at $url"
+    $l.Start()
+    Write-Output "Server: $u"
     
-    # Create data directory if not exists
-    $dataDir = Join-Path $PSScriptRoot "data"
-    if (-not (Test-Path $dataDir)) {
-        New-Item -ItemType Directory -Path $dataDir | Out-Null
-        Write-Output "Created data directory: $dataDir"
-    } else {
-        Write-Output "Data directory exists: $dataDir"
+    # Data dir
+    $d = Join-Path $PSScriptRoot "data"
+    if (-not (Test-Path $d)) {
+        New-Item -ItemType Directory -Path $d | Out-Null
+        Write-Output "Created: $d"
     }
     
-    # Create sample data if not exists
-    $booksFile = Join-Path $dataDir "books.json"
-    if (-not (Test-Path $booksFile)) {
-        $sampleBooks = @(
-            @{
-                id = 1
-                title = "PowerShell Book"
-                author = "Yamada Taro"
-                publisher = "Technical Publishing"
-                publishedDate = "2024-01-01"
-                isbn = "978-4-7741-1234-5"
-            },
-            @{
-                id = 2
-                title = "Windows Features Guide"
-                author = "Suzuki Hanako"
-                publisher = "IT Publishing"
-                publishedDate = "2024-02-15"
-                isbn = "978-4-7981-5678-9"
-            }
+    # Data file
+    $f = Join-Path $d "books.json"
+    if (-not (Test-Path $f)) {
+        $b = @(
+            @{id=1;title="PowerShell Book";author="Yamada";publisher="Tech Pub";publishedDate="2024-01-01";isbn="978-4-7741-1234-5"},
+            @{id=2;title="Windows Guide";author="Suzuki";publisher="IT Pub";publishedDate="2024-02-15";isbn="978-4-7981-5678-9"}
         )
-        $sampleBooks | ConvertTo-Json | Set-Content $booksFile -Encoding UTF8
-        Write-Output "Created sample data: $booksFile"
-    } else {
-        Write-Output "Sample data exists: $booksFile"
+        $b | ConvertTo-Json | Set-Content $f -Encoding UTF8
+        Write-Output "Created: $f"
     }
 
-    # Open browser
-    Write-Output "Opening browser..."
-    Start-Process $url
+    # Browser
+    Start-Process $u
     
-    # MIME types
-    $mimeTypes = @{
-        ".html" = "text/html"
-        ".js"   = "text/javascript"
-        ".css"  = "text/css"
-        ".json" = "application/json"
-        ".xml"  = "application/xml"
+    # MIME
+    $m = @{
+        ".html"="text/html";".js"="text/javascript";".css"="text/css";
+        ".json"="application/json";".xml"="application/xml"
     }
     
-    # Main server loop
-    Write-Output "Starting server loop..."
-    while ($listener.IsListening) {
-        $context = $listener.GetContext()
-        $request = $context.Request
-        $response = $context.Response
+    # Main loop
+    Write-Output "Running..."
+    while ($l.IsListening) {
+        $c = $l.GetContext()
+        $r = $c.Request
+        $s = $c.Response
         
-        # Request path
-        $requestPath = $request.Url.LocalPath.TrimStart('/')
-        Write-Output "Request received: $($request.HttpMethod) $($request.Url.LocalPath)"
+        # Path
+        $h = $r.Url.LocalPath.TrimStart('/')
+        Write-Output "$($r.HttpMethod) $($r.Url.LocalPath)"
         
-        # API endpoint handling
-        if ($requestPath.StartsWith("api/")) {
-            Write-Output "  API request: $requestPath"
-            $endpoint = $requestPath.Substring(4)
-            $method = $request.HttpMethod
+        # API
+        if ($h.StartsWith("api/")) {
+            $a = $h.Substring(4)
+            $t = $r.HttpMethod
             
-            # CORS headers
-            $response.Headers.Add("Access-Control-Allow-Origin", "*")
-            $response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-            $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
+            # CORS
+            $s.Headers.Add("Access-Control-Allow-Origin", "*")
+            $s.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+            $s.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
             
-            # OPTIONS request
-            if ($method -eq "OPTIONS") {
-                $response.StatusCode = 200
-                $response.Close()
-                Write-Output "  OPTIONS request handled"
+            # OPTIONS
+            if ($t -eq "OPTIONS") {
+                $s.StatusCode = 200
+                $s.Close()
                 continue
             }
             
+            # Data operations
+            if ($a -eq "data/download") {
+                try {
+                    if (Test-Path $f) {
+                        $x = Get-Content $f -Encoding UTF8 -Raw
+                        $o = $e.GetBytes($x)
+                        $s.ContentType = "application/json"
+                        $s.Headers.Add("Content-Disposition", "attachment; filename=books.json")
+                        $s.ContentLength64 = $o.Length
+                        $s.OutputStream.Write($o, 0, $o.Length)
+                    } else {
+                        $s.StatusCode = 404
+                    }
+                } catch {
+                    $s.StatusCode = 500
+                }
+            }
+            elseif ($a -eq "data/upload" -and $t -eq "POST") {
+                try {
+                    $i = New-Object System.IO.StreamReader($r.InputStream)
+                    $x = $i.ReadToEnd()
+                    $null = $x | ConvertFrom-Json
+                    $x | Set-Content $f -Encoding UTF8
+                    
+                    $s.StatusCode = 200
+                    $g = "OK"
+                    $o = $e.GetBytes($g)
+                    $s.ContentType = "text/plain"
+                    $s.ContentLength64 = $o.Length
+                    $s.OutputStream.Write($o, 0, $o.Length)
+                } catch {
+                    $s.StatusCode = 400
+                    $g = "Error: $($_.Exception.Message)"
+                    $o = $e.GetBytes($g)
+                    $s.ContentType = "text/plain"
+                    $s.ContentLength64 = $o.Length
+                    $s.OutputStream.Write($o, 0, $o.Length)
+                }
+            }
+            elseif ($a -eq "data/edit" -and $t -eq "POST") {
+                try {
+                    $i = New-Object System.IO.StreamReader($r.InputStream)
+                    $j = $i.ReadToEnd()
+                    $null = $j | ConvertFrom-Json
+                    $j | Set-Content $f -Encoding UTF8
+                    
+                    $s.StatusCode = 200
+                    $g = "OK"
+                    $o = $e.GetBytes($g)
+                    $s.ContentType = "text/plain"
+                    $s.ContentLength64 = $o.Length
+                    $s.OutputStream.Write($o, 0, $o.Length)
+                } catch {
+                    $s.StatusCode = 400
+                    $g = "Error: $($_.Exception.Message)"
+                    $o = $e.GetBytes($g)
+                    $s.ContentType = "text/plain"
+                    $s.ContentLength64 = $o.Length
+                    $s.OutputStream.Write($o, 0, $o.Length)
+                }
+            }
+            elseif ($a -eq "data/view") {
+                try {
+                    if (Test-Path $f) {
+                        $x = Get-Content $f -Encoding UTF8 -Raw
+                        $o = $e.GetBytes($x)
+                        $s.ContentType = "application/json"
+                        $s.ContentLength64 = $o.Length
+                        $s.OutputStream.Write($o, 0, $o.Length)
+                    } else {
+                        $s.StatusCode = 404
+                    }
+                } catch {
+                    $s.StatusCode = 500
+                }
+            }
             # Books API
-            if ($endpoint -eq "books") {
-                Write-Output "  Books API: $method"
-                switch ($method) {
+            elseif ($a -eq "books") {
+                switch ($t) {
                     "GET" {
-                        # Get books
-                        $data = Get-Content $booksFile -Encoding UTF8 | ConvertFrom-Json
-                        $jsonResponse = $data | ConvertTo-Json
-                        $buffer = [System.Text.Encoding]::UTF8.GetBytes($jsonResponse)
-                        $response.ContentType = "application/json"
-                        $response.ContentLength64 = $buffer.Length
-                        $response.OutputStream.Write($buffer, 0, $buffer.Length)
-                        Write-Output "  Sent books data: $($data.Length) books"
+                        $k = Get-Content $f -Encoding UTF8 | ConvertFrom-Json
+                        $j = $k | ConvertTo-Json
+                        $o = $e.GetBytes($j)
+                        $s.ContentType = "application/json"
+                        $s.ContentLength64 = $o.Length
+                        $s.OutputStream.Write($o, 0, $o.Length)
                     }
                     "POST" {
-                        # Add book
-                        $reader = New-Object System.IO.StreamReader($request.InputStream)
-                        $body = $reader.ReadToEnd()
-                        $newBook = $body | ConvertFrom-Json
+                        $i = New-Object System.IO.StreamReader($r.InputStream)
+                        $w = $i.ReadToEnd()
+                        $v = $w | ConvertFrom-Json
                         
-                        $books = Get-Content $booksFile -Encoding UTF8 | ConvertFrom-Json
-                        $newBook.id = if ($books.Count -eq 0) { 1 } else { ($books | Measure-Object -Property id -Maximum).Maximum + 1 }
-                        $books += $newBook
-                        
-                        $books | ConvertTo-Json | Set-Content $booksFile -Encoding UTF8
-                        
-                        $response.StatusCode = 201
-                        $jsonResponse = $newBook | ConvertTo-Json
-                        $buffer = [System.Text.Encoding]::UTF8.GetBytes($jsonResponse)
-                        $response.ContentType = "application/json"
-                        $response.ContentLength64 = $buffer.Length
-                        $response.OutputStream.Write($buffer, 0, $buffer.Length)
-                        Write-Output "  Added new book: $($newBook.title)"
+                        try {
+                            $k = Get-Content $f -Encoding UTF8 | ConvertFrom-Json
+                            if ($k -isnot [array]) { $k = @($k) }
+                            
+                            $z = 0
+                            foreach ($y in $k) { if ($y.id -gt $z) { $z = $y.id } }
+                            
+                            $n = [PSCustomObject]@{
+                                id = $z + 1; title = $v.title; author = $v.author
+                                publisher = $v.publisher; publishedDate = $v.publishedDate; isbn = $v.isbn
+                            }
+                            
+                            $k += $n
+                            $k | ConvertTo-Json | Set-Content $f -Encoding UTF8
+                            
+                            $s.StatusCode = 201
+                            $j = $n | ConvertTo-Json
+                            $o = $e.GetBytes($j)
+                            $s.ContentType = "application/json"
+                            $s.ContentLength64 = $o.Length
+                            $s.OutputStream.Write($o, 0, $o.Length)
+                        }
+                        catch {
+                            $s.StatusCode = 500
+                            $g = "Error: $($_.Exception.Message)"
+                            $o = $e.GetBytes($g)
+                            $s.ContentType = "text/plain"
+                            $s.ContentLength64 = $o.Length
+                            $s.OutputStream.Write($o, 0, $o.Length)
+                        }
                     }
                     "PUT" {
-                        # Update book
-                        $reader = New-Object System.IO.StreamReader($request.InputStream)
-                        $body = $reader.ReadToEnd()
-                        $updatedBook = $body | ConvertFrom-Json
-                        
-                        $books = Get-Content $booksFile -Encoding UTF8 | ConvertFrom-Json
-                        $index = $books.id.IndexOf($updatedBook.id)
-                        if ($index -ge 0) {
-                            $books[$index] = $updatedBook
-                            $books | ConvertTo-Json | Set-Content $booksFile -Encoding UTF8
-                            $response.StatusCode = 200
-                            Write-Output "  Updated book: $($updatedBook.title)"
-                        } else {
-                            $response.StatusCode = 404
-                            Write-Output "  Book not found: ID $($updatedBook.id)"
+                        try {
+                            $i = New-Object System.IO.StreamReader($r.InputStream)
+                            $w = $i.ReadToEnd()
+                            $q = $w | ConvertFrom-Json
+                            
+                            $k = Get-Content $f -Encoding UTF8 | ConvertFrom-Json
+                            if ($k -isnot [array]) { $k = @($k) }
+                            
+                            $x = -1
+                            for ($i = 0; $i -lt $k.Length; $i++) {
+                                if ($k[$i].id -eq $q.id) { $x = $i; break }
+                            }
+                            
+                            if ($x -ge 0) {
+                                $k[$x] = $q
+                                $k | ConvertTo-Json | Set-Content $f -Encoding UTF8
+                                $s.StatusCode = 200
+                            } else {
+                                $s.StatusCode = 404
+                            }
+                        }
+                        catch {
+                            $s.StatusCode = 500
                         }
                     }
                     "DELETE" {
-                        # Delete book
-                        $id = [int]$request.QueryString["id"]
-                        $books = Get-Content $booksFile -Encoding UTF8 | ConvertFrom-Json
-                        $books = $books | Where-Object { $_.id -ne $id }
-                        $books | ConvertTo-Json | Set-Content $booksFile -Encoding UTF8
-                        $response.StatusCode = 204
-                        Write-Output "  Deleted book: ID $id"
+                        try {
+                            $i = [int]$r.QueryString["id"]
+                            $k = Get-Content $f -Encoding UTF8 | ConvertFrom-Json
+                            if ($k -isnot [array]) { $k = @($k) }
+                            
+                            $k = $k | Where-Object { $_.id -ne $i }
+                            $k | ConvertTo-Json | Set-Content $f -Encoding UTF8
+                            $s.StatusCode = 204
+                        }
+                        catch {
+                            $s.StatusCode = 500
+                        }
                     }
                 }
             }
+            else {
+                $s.StatusCode = 404
+                $g = "Unknown: $a"
+                $o = $e.GetBytes($g)
+                $s.ContentType = "text/plain"
+                $s.ContentLength64 = $o.Length
+                $s.OutputStream.Write($o, 0, $o.Length)
+            }
         }
-        # Static files
+        # Files
         else {
-            Write-Output "  Static file request: $requestPath"
-            
-            # 修正: Join-Pathの使い方を修正
-            if ([string]::IsNullOrEmpty($requestPath)) {
-                $localPath = Join-Path $PSScriptRoot "public\index.html"
+            if ([string]::IsNullOrEmpty($h)) {
+                $v = Join-Path $PSScriptRoot "public\index.html"
             } else {
-                $localPath = Join-Path $PSScriptRoot "public\$requestPath"
+                $v = Join-Path $PSScriptRoot "public\$h"
             }
             
-            Write-Output "  Looking for file: $localPath"
-            
-            if (Test-Path $localPath -PathType Leaf) {
-                $extension = [System.IO.Path]::GetExtension($localPath)
-                $contentType = $mimeTypes[$extension]
-                if (-not $contentType) {
-                    $contentType = "application/octet-stream"
-                }
+            if (Test-Path $v -PathType Leaf) {
+                $x = [System.IO.Path]::GetExtension($v)
+                $y = $m[$x]
+                if (-not $y) { $y = "application/octet-stream" }
                 
                 try {
-                    $content = [System.IO.File]::ReadAllBytes($localPath)
-                    $response.Headers.Add("Content-Type", $contentType)
-                    $response.ContentLength64 = $content.Length
-                    $response.OutputStream.Write($content, 0, $content.Length)
-                    Write-Output "  Sent file: $localPath ($($content.Length) bytes)"
+                    $z = [System.IO.File]::ReadAllBytes($v)
+                    $s.Headers.Add("Content-Type", $y)
+                    $s.ContentLength64 = $z.Length
+                    $s.OutputStream.Write($z, 0, $z.Length)
                 }
                 catch {
-                    Write-Output "  Error reading file: $($_.Exception.Message)"
-                    $response.StatusCode = 500
+                    $s.StatusCode = 500
                 }
             }
             else {
-                Write-Output "  File not found: $localPath"
-                $response.StatusCode = 404
-                $errorMessage = "File not found: $requestPath"
-                $buffer = [System.Text.Encoding]::UTF8.GetBytes($errorMessage)
-                $response.ContentType = "text/plain"
-                $response.ContentLength64 = $buffer.Length
-                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                $s.StatusCode = 404
+                $g = "Not found: $h"
+                $o = $e.GetBytes($g)
+                $s.ContentType = "text/plain"
+                $s.ContentLength64 = $o.Length
+                $s.OutputStream.Write($o, 0, $o.Length)
             }
         }
         
-        $response.Close()
+        $s.Close()
     }
 }
 catch {
-    Write-Output "An error occurred:"
-    Write-Output $_.Exception.Message
-    Write-Output $_.ScriptStackTrace
-    Write-Output "Press Enter to exit..."
+    Write-Output "Error: $($_.Exception.Message)"
     Read-Host
 }
 finally {
-    if ($listener -ne $null) {
-        $listener.Stop()
-        $listener.Close()
+    if ($l -ne $null) {
+        $l.Stop()
+        $l.Close()
     }
 } 

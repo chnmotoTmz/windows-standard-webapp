@@ -35,6 +35,28 @@
 
 ## 技術的な特徴
 
+### 変数名の簡略化について
+
+当プロジェクトでは、以下の理由により変数名を極力短く簡略化しています：
+
+- **非英語話者への配慮**：英語を母国語としないユーザーにとって、長い英語の変数名は認識・判別が困難な場合があります
+- **画面表示の最適化**：狭い画面や低解像度環境での可読性向上
+- **文字化け防止**：特殊文字を含む長い変数名が環境によって文字化けするリスクを軽減
+- **タイプ量削減**：学習時にコードを手入力する際の負担軽減
+
+主な変数の対応表：
+
+| 短縮変数 | 元の変数名 | 役割 |
+|---|---|---|
+| $e | $outputEncoding | 文字エンコーディング |
+| $l | $listener | HTTPリスナー |
+| $p | $port | ポート番号 |
+| $u | $url | サーバーURL |
+| $d | $dataDir | データディレクトリ |
+| $f | $booksFile | 書籍データファイル |
+| $s | $response | HTTPレスポンス |
+| $r | $request | HTTPリクエスト |
+
 ### 使用技術
 
 - **フロントエンド**：HTML5, CSS3, JavaScript (ES6)
@@ -65,28 +87,28 @@ PowerShellの標準機能のみを使用したHTTPサーバーとAPIを実装し
 
 ```powershell
 # PowerShellで標準HTTPリスナーを作成
-$listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add('http://localhost:8080/')
-$listener.Start()
+$l = New-Object System.Net.HttpListener
+$l.Prefixes.Add('http://localhost:8080/')
+$l.Start()
 
 # APIエンドポイントの処理
-while ($listener.IsListening) {
-    $context = $listener.GetContext()
-    $request = $context.Request
-    $response = $context.Response
+while ($l.IsListening) {
+    $c = $l.GetContext()
+    $r = $c.Request
+    $s = $c.Response
     
-    if ($request.Url.LocalPath -eq "/api/books" -and $request.HttpMethod -eq "GET") {
+    if ($r.Url.LocalPath -eq "/api/books" -and $r.HttpMethod -eq "GET") {
         # JSONデータの取得と返送
-        $data = Get-Content ".\data\books.json" | ConvertFrom-Json
-        $jsonResponse = $data | ConvertTo-Json
-        $buffer = [System.Text.Encoding]::UTF8.GetBytes($jsonResponse)
-        $response.ContentType = "application/json"
-        $response.ContentLength64 = $buffer.Length
-        $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        $k = Get-Content ".\data\books.json" | ConvertFrom-Json
+        $j = $k | ConvertTo-Json
+        $o = [System.Text.Encoding]::UTF8.GetBytes($j)
+        $s.ContentType = "application/json"
+        $s.ContentLength64 = $o.Length
+        $s.OutputStream.Write($o, 0, $o.Length)
     }
     # その他のエンドポイント処理...
     
-    $response.Close()
+    $s.Close()
 }
 ```
 
